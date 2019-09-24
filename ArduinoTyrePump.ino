@@ -1,4 +1,5 @@
-#include "SevSeg.h"
+#include <SevSeg.h>
+#include <TM1637.h>
 
 // currently using an Ardiuno Mega
 
@@ -11,6 +12,8 @@ const byte numDigits = 4;
 const byte digitPins[] = { 53, 51, 52, 50 };
 const byte segmentPins[] = { 23, 24, 33, 31, 30, 22, 34, 32 };
 
+TM1637 tm1637(2, 3);
+
 SevSeg ss;
 
 void setup() 
@@ -19,6 +22,9 @@ void setup()
   pinMode(Valve, OUTPUT);
   
   ss.begin(COMMON_CATHODE, numDigits, digitPins, segmentPins);
+
+  tm1637.init();
+  tm1637.setBrightness(5);
   
   Serial.begin(115200);
 }
@@ -36,8 +42,10 @@ enum class State
 State state = State::Idle;
 float setPressure = 0.0f;
 int lastStateChange = millis();
+auto lastPot = 0.0f;
 
 const float PressureDelta = 0.05;
+
 
 void loop() 
 {
@@ -46,10 +54,17 @@ void loop()
   const auto pressure = analogRead(AirMeter) * 2.06f / 1023; // 30 psi = 5V for my transducer
   auto newState = state;
 
+  auto pot = analogRead(Potentiometer) * 2.0f / 1023.0f; // 2 bar max for kart tyre
+  if (abs(pot - lastPot) < 0.02) 
+     pot = lastPot;
+  else
+     lastPot = pot;
+
   switch(state) {
   case State::Idle:
-    setPressure = analogRead(Potentiometer) * 2.0f / 1023; // 2 bar max for kart tyre
-    ss.setNumber(setPressure);
+    setPressure = pot;
+    ss.setNumber(int(setPressure * 100));
+    tm1637.dispNumber(int(setPressure * 100));
 
     if (pressure > 0.1) 
       newState = State::Wait;    
